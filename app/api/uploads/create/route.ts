@@ -1,8 +1,10 @@
+// app/api/uploads/create/route.ts
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 const BUCKET = "hi5-uploads";
 const UPLOAD_EXPIRES_SECONDS = 600; // 10 minutes
@@ -21,9 +23,7 @@ function badRequest(msg: string) {
 
 function safeFileName(name: string) {
   const base = (name || "file").trim();
-  // replace weird chars with _
   const cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_");
-  // avoid empty
   return cleaned.length ? cleaned : "file";
 }
 
@@ -42,6 +42,9 @@ export async function POST(req: Request) {
     if (typeof sizeBytes !== "number") return badRequest("sizeBytes must be a number");
 
     const fileName = safeFileName(originalName);
+
+    // ✅ IMPORTANT: create admin client here
+    const supabaseAdmin = getSupabaseAdmin();
 
     // 1) Insert DB row (PENDING)
     const { data: row, error: insertErr } = await supabaseAdmin
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
       return json({ ok: false, stage: "db-update", error: updateErr.message }, 500);
     }
 
-    // 4) Create signed upload URL (Supabase Storage)
+    // 4) Create signed upload URL
     const { data: signed, error: signedErr } = await supabaseAdmin.storage
       .from(BUCKET)
       .createSignedUploadUrl(path, { upsert: false });
