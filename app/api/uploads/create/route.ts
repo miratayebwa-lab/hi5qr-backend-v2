@@ -1,10 +1,10 @@
 // app/api/uploads/create/route.ts
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const BUCKET = "hi5-uploads";
 const UPLOAD_EXPIRES_SECONDS = 600; // 10 minutes
@@ -43,7 +43,9 @@ export async function POST(req: Request) {
     if (!type) return badRequest("Missing type");
     if (!originalName) return badRequest("Missing originalName");
     if (!mimeType) return badRequest("Missing mimeType");
-    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return badRequest("sizeBytes must be a positive number");
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      return badRequest("sizeBytes must be a positive number");
+    }
 
     const fileName = safeFileName(originalName);
 
@@ -88,10 +90,10 @@ export async function POST(req: Request) {
       return json({ ok: false, stage: "db-update", error: updateErr.message }, 500);
     }
 
-    // 4) Create signed upload URL (✅ correct signature)
+    // 4) Create signed upload URL (✅ correct for your supabase-js types)
     const { data: signed, error: signedErr } = await supabaseAdmin.storage
       .from(BUCKET)
-      .createSignedUploadUrl(path, UPLOAD_EXPIRES_SECONDS);
+      .createSignedUploadUrl(path, { upsert: false });
 
     if (signedErr || !signed?.signedUrl) {
       return json(
