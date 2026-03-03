@@ -29,17 +29,21 @@ function safeFileName(name: string) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body) return badRequest("Invalid JSON body");
 
-    const type = body?.type;
+    const typeRaw = body?.type;
     const originalName = body?.originalName;
     const mimeType = body?.mimeType;
-    const sizeBytes = body?.sizeBytes;
+    const sizeBytesRaw = body?.sizeBytes;
+
+    const type = String(typeRaw || "").trim().toUpperCase();
+    const sizeBytes = Number(sizeBytesRaw);
 
     if (!type) return badRequest("Missing type");
     if (!originalName) return badRequest("Missing originalName");
     if (!mimeType) return badRequest("Missing mimeType");
-    if (typeof sizeBytes !== "number") return badRequest("sizeBytes must be a number");
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return badRequest("sizeBytes must be a positive number");
 
     const fileName = safeFileName(originalName);
 
@@ -69,7 +73,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const qrId = row.id as string;
+    const qrId = String(row.id);
 
     // 2) Storage path
     const path = `mode2/${qrId}/${fileName}`;
@@ -84,10 +88,10 @@ export async function POST(req: Request) {
       return json({ ok: false, stage: "db-update", error: updateErr.message }, 500);
     }
 
-    // 4) Create signed upload URL
+    // 4) Create signed upload URL (✅ correct signature)
     const { data: signed, error: signedErr } = await supabaseAdmin.storage
       .from(BUCKET)
-      .createSignedUploadUrl(path, { upsert: false });
+      .createSignedUploadUrl(path, UPLOAD_EXPIRES_SECONDS);
 
     if (signedErr || !signed?.signedUrl) {
       return json(
@@ -100,6 +104,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // ✅ Locked response shape that Android expects
     return json({
       ok: true,
       stage: "signed-upload-ok",
