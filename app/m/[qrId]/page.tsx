@@ -15,16 +15,29 @@ export default async function Mode2ViewerPage({ params }: Props) {
     process.env.SUPABASE_SERVICE_ROLE_KEY! // server-only
   );
 
-  const { data, error } = await supabase
-    .from("qr_items")
-    .select("id, mode, type, status, mime_type, storage_bucket, storage_path, created_at")
-    .eq("id", qrId)
-    .single();
+  const columns = "id, mode, type, status, mime_type, storage_bucket, storage_path, created_at";
 
-  if (error || !data) return notFound();
+  const tryCols = ["id", "qr_id", "public_id", "code", "slug"] as const;
+
+  let data: any = null;
+
+  for (const col of tryCols) {
+    const { data: row, error } = await supabase
+      .from("qr_items")
+      .select(columns)
+      .eq(col, qrId)
+      .maybeSingle();
+
+    if (!error && row) {
+      data = row;
+      break;
+    }
+  }
+
+  if (!data) return notFound();
 
   return (
-    <main style={{ padding: 24, fontFamily: "system-ui" }}>
+    <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 900, margin: "0 auto" }}>
       <h1 style={{ marginBottom: 8 }}>HI5 Viewer</h1>
 
       <div style={{ opacity: 0.85, marginBottom: 16 }}>
